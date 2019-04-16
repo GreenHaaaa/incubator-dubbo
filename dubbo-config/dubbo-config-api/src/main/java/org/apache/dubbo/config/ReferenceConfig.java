@@ -192,6 +192,8 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
     /**
      * This method should be called right after the creation of this class's instance, before any property in other config modules is used.
      * Check each config modules are created properly and override their properties if necessary.
+     * 这个方法必须要这个类的实例创建之前被调用，在任何配置模块被使用之前，检查每一个配置模块已经创建
+     * 并且在必要的情况下覆盖他们的属性。
      */
     public void checkAndUpdateSubConfigs() {
         if (StringUtils.isEmpty(interfaceName)) {
