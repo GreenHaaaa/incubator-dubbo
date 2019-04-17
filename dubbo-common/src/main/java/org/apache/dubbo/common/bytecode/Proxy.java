@@ -80,12 +80,12 @@ public abstract class Proxy {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < ics.length; i++) {
             String itf = ics[i].getName();
-            if (!ics[i].isInterface()) {
+            if (!ics[i].isInterface()) { //校验是否为接口
                 throw new RuntimeException(itf + " is not a interface.");
             }
 
             Class<?> tmp = null;
-            try {
+            try {//加载接口类
                 tmp = Class.forName(itf, false, cl);
             } catch (ClassNotFoundException e) {
             }
@@ -93,14 +93,14 @@ public abstract class Proxy {
             if (tmp != ics[i]) {
                 throw new IllegalArgumentException(ics[i] + " is not visible from class loader");
             }
-
+            //拼接接口名，使用;作为分隔符
             sb.append(itf).append(';');
         }
 
         // use interface class name list as key.
         String key = sb.toString();
 
-        // get cache by class loader.
+        // get cache by class loader.根据类加载器获取缓存
         Map<String, Object> cache;
         synchronized (ProxyCacheMap) {
             cache = ProxyCacheMap.computeIfAbsent(cl, k -> new HashMap<>());
@@ -108,7 +108,7 @@ public abstract class Proxy {
 
         Proxy proxy = null;
         synchronized (cache) {
-            do {
+            do {//尝试从缓冲中获取代理类
                 Object value = cache.get(key);
                 if (value instanceof Reference<?>) {
                     proxy = (Proxy) ((Reference<?>) value).get();
@@ -116,7 +116,7 @@ public abstract class Proxy {
                         return proxy;
                     }
                 }
-
+                //这里做了并发控制,相同的key下只需要执行下面的一次，因此在其余在此等待，notify后获取缓存内的数据，直接退出
                 if (value == PendingGenerationMarker) {
                     try {
                         cache.wait();
@@ -140,8 +140,8 @@ public abstract class Proxy {
             List<Method> methods = new ArrayList<>();
 
             for (int i = 0; i < ics.length; i++) {
-                if (!Modifier.isPublic(ics[i].getModifiers())) {
-                    String npkg = ics[i].getPackage().getName();
+                if (!Modifier.isPublic(ics[i].getModifiers())) {  //接口是否为public或者非public但处在同一个包下
+                    String npkg = ics[i].getPackage().getName();//获取包名
                     if (pkg == null) {
                         pkg = npkg;
                     } else {
@@ -150,6 +150,7 @@ public abstract class Proxy {
                         }
                     }
                 }
+                //以下获取接口的方法以及参数信息用于生产一个代理类
                 ccp.addInterface(ics[i]);
 
                 for (Method method : ics[i].getMethods()) {

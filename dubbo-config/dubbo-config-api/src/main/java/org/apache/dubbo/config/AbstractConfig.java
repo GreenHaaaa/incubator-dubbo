@@ -485,6 +485,7 @@ public abstract class AbstractConfig implements Serializable {
         for (Method method : methods) {
             try {
                 String name = method.getName();
+                //基础数据的get方法
                 if (isMetaMethod(method)) {
                     String prop = calculateAttributeFromGetter(name);
                     String key;
@@ -500,8 +501,10 @@ public abstract class AbstractConfig implements Serializable {
                         metaData.put(key, null);
                         continue;
                     }
+                    //执行上一部获取到的getter方法获取key的值
                     Object value = method.invoke(this);
                     String str = String.valueOf(value).trim();
+                    //将key的值存入元数据map
                     if (value != null && str.length() > 0) {
                         metaData.put(key, str);
                     } else {
@@ -538,11 +541,16 @@ public abstract class AbstractConfig implements Serializable {
     /**
      * TODO: Currently, only support overriding of properties explicitly defined in Config class, doesn't support
      * overriding of customized parameters stored in 'parameters'.
+     * 这个方法首先反射获取到应用内的配置信息存储到应用的配置信息组合类中（composeiteConfiguration）,然后按照
+     * SystemConfiguration -> AbstractConfig -> AppExternalConfiguration -> ExternalConfiguration -> PropertiesConfiguration
+     * 外部化配置优先：The sequence would be: SystemConfiguration -> AppExternalConfiguration -> ExternalConfiguration -> AbstractConfig -> PropertiesConfiguration
+     * 上述序列依次查找配置属性，覆盖到该抽象类的子类中
      */
     public void refresh() {
         try {
             CompositeConfiguration compositeConfiguration = Environment.getInstance().getConfiguration(getPrefix(), getId());
             InmemoryConfiguration config = new InmemoryConfiguration(getPrefix(), getId());
+            //getMetaData()通过反射获取到AbstractConfig的之类的基本属性
             config.addProperties(getMetaData());
             if (Environment.getInstance().isConfigCenterFirst()) {
                 // The sequence would be: SystemConfiguration -> AppExternalConfiguration -> ExternalConfiguration -> AbstractConfig -> PropertiesConfiguration
@@ -555,6 +563,7 @@ public abstract class AbstractConfig implements Serializable {
             // loop methods, get override value and set the new value back to method
             Method[] methods = getClass().getMethods();
             for (Method method : methods) {
+                //循环调用setter赋值，值来自于上一步compositeConfiguration中
                 if (ClassHelper.isSetter(method)) {
                     try {
                         String value = StringUtils.trim(compositeConfiguration.getString(extractPropertyName(getClass(), method)));

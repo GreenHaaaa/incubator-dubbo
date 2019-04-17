@@ -394,17 +394,19 @@ public class DubboProtocol extends AbstractProtocol {
 
     private ExchangeClient[] getClients(URL url) {
         // whether to share connection
-
+        //是否共享连接
         boolean useShareConnect = false;
 
         int connections = url.getParameter(Constants.CONNECTIONS_KEY, 0);
         List<ReferenceCountExchangeClient> shareClients = null;
         // if not configured, connection is shared, otherwise, one connection for one service
+        // 如果未配置 connections，则共享连接
         if (connections == 0) {
             useShareConnect = true;
 
             /**
              * The xml configuration should have a higher priority than properties.
+             * Xml的配置应优先于properties文件
              */
             String shareConnectionsStr = url.getParameter(Constants.SHARE_CONNECTIONS_KEY, (String) null);
             connections = Integer.parseInt(StringUtils.isBlank(shareConnectionsStr) ? ConfigUtils.getProperty(Constants.SHARE_CONNECTIONS_KEY,
@@ -413,6 +415,7 @@ public class DubboProtocol extends AbstractProtocol {
         }
 
         ExchangeClient[] clients = new ExchangeClient[connections];
+        //这里根据 connections 数量决定是获取共享客户端还是创建新的客户端实例，默认情况下，使用共享客户端实例。
         for (int i = 0; i < clients.length; i++) {
             if (useShareConnect) {
                 clients[i] = shareClients.get(i);
@@ -427,7 +430,9 @@ public class DubboProtocol extends AbstractProtocol {
 
     /**
      * Get shared connection
-     *
+     * 先访问缓存，若缓存未命中，则通过 initClient 方法创建新的 ExchangeClient 实例，
+     * 并将该实例传给 ReferenceCountExchangeClient 构造方法创建一个带有引用计数功能的
+     * ExchangeClient 实例。
      * @param url
      * @param connectNum connectNum must be greater than or equal to 1
      */
@@ -436,14 +441,17 @@ public class DubboProtocol extends AbstractProtocol {
         List<ReferenceCountExchangeClient> clients = referenceClientMap.get(key);
 
         if (checkClientCanUse(clients)) {
+            //url对应多个客户端增加引用计数器
             batchClientRefIncr(clients);
             return clients;
         }
 
         locks.putIfAbsent(key, new Object());
+        //虽然是以concurrentHashMap,但是为了保证下列代码块内代码都能保证现场安全，需要使用synchronized
         synchronized (locks.get(key)) {
             clients = referenceClientMap.get(key);
             // dubbo check
+            //保证在上一个if结束到同步代码块进入之前 client变得可用的情况
             if (checkClientCanUse(clients)) {
                 batchClientRefIncr(clients);
                 return clients;
@@ -549,14 +557,16 @@ public class DubboProtocol extends AbstractProtocol {
 
     /**
      * Create new connection
-     *
+     *initClient 方法首先获取用户配置的客户端类型，默认为 netty。然后检测用户配置的客户端类型是否存在，
+     * 不存在则抛出异常。最后根据 lazy 配置决定创建什么类型的客户端。
      * @param url
      */
     private ExchangeClient initClient(URL url) {
 
         // client type setting.
+        // 获取客户端类型，默认为 netty
         String str = url.getParameter(Constants.CLIENT_KEY, url.getParameter(Constants.SERVER_KEY, Constants.DEFAULT_REMOTING_CLIENT));
-
+        //编码和心跳包参数存入url
         url = url.addParameter(Constants.CODEC_KEY, DubboCodec.NAME);
         // enable heartbeat by default
         url = url.addParameterIfAbsent(Constants.HEARTBEAT_KEY, String.valueOf(Constants.DEFAULT_HEARTBEAT));

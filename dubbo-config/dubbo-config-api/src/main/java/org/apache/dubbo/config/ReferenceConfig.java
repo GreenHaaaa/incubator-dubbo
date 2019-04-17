@@ -196,14 +196,19 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
      * 并且在必要的情况下覆盖他们的属性。
      */
     public void checkAndUpdateSubConfigs() {
+        //接口名非空校验
         if (StringUtils.isEmpty(interfaceName)) {
             throw new IllegalStateException("<dubbo:reference interface=\"\" /> interface not allow null!");
         }
+        //对必要的配置信息进行检查且赋值
         completeCompoundConfigs();
+        //获取所有配置类信息，按照优先级对配置信息进行覆盖（refresh()）
+        //todo  dubbo外部化配置动态配置中心（2.7.0）
         startConfigCenter();
         // get consumer's global configuration
         checkDefault();
         this.refresh();
+        //接口泛化
         if (getGeneric() == null && getConsumer() != null) {
             setGeneric(getConsumer().getGeneric());
         }
@@ -216,14 +221,18 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
             } catch (ClassNotFoundException e) {
                 throw new IllegalStateException(e.getMessage(), e);
             }
+            //校验接口名是否是一个接口以及远程服务是否有提供该方法
             checkInterfaceAndMethods(interfaceClass, methods);
         }
+        //默认加载${user.home}/dubbo-resolve.properties配置文件
         resolveFile();
+        //校验 ApplicationConfig 配置。
         checkApplication();
         checkMetadataReport();
     }
 
     public synchronized T get() {
+        // 生成代理类前的属性检查和配置引入
         checkAndUpdateSubConfigs();
 
         if (destroyed) {
@@ -253,23 +262,26 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
     }
 
     private void init() {
+        //已经初始化，直接返回
         if (initialized) {
             return;
         }
         initialized = true;
         checkStubAndLocal(interfaceClass);
         checkMock(interfaceClass);
+        //下面将具体的配置信息收集起来用于生产url
         Map<String, String> map = new HashMap<String, String>();
 
         map.put(Constants.SIDE_KEY, Constants.CONSUMER_SIDE);
 
         appendRuntimeParameters(map);
         if (!isGeneric()) {
+            //从包名获取版本号
             String revision = Version.getVersion(interfaceClass, version);
             if (revision != null && revision.length() > 0) {
                 map.put(Constants.REVISION_KEY, revision);
             }
-
+            //获取方法名
             String[] methods = Wrapper.getWrapper(interfaceClass).getMethodNames();
             if (methods.length == 0) {
                 logger.warn("No method found in service interface " + interfaceClass.getName());
@@ -292,6 +304,7 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
                 String retryKey = methodConfig.getName() + ".retry";
                 if (map.containsKey(retryKey)) {
                     String retryValue = map.remove(retryKey);
+                    //禁用失败重试
                     if ("false".equals(retryValue)) {
                         map.put(methodConfig.getName() + ".retries", "0");
                     }
@@ -299,7 +312,7 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
                 attributes.put(methodConfig.getName(), convertMethodConfig2AyncInfo(methodConfig));
             }
         }
-
+        //获取ip，用于注册到注册中心
         String hostToRegistry = ConfigUtils.getSystemProperty(Constants.DUBBO_IP_TO_REGISTRY);
         if (StringUtils.isEmpty(hostToRegistry)) {
             hostToRegistry = NetUtils.getLocalHost();
@@ -308,6 +321,7 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
 
         ref = createProxy(map);
 
+        // 并将 ConsumerModel 存入到 ApplicationModel 中
         String serviceKey = URL.buildKey(interfaceName, group, version);
         ApplicationModel.initConsumerModel(serviceKey, buildConsumerModel(serviceKey, attributes));
     }
@@ -334,6 +348,7 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
                 logger.info("Using injvm service " + interfaceClass.getName());
             }
         } else {
+            //dubbo  配置中指定url使用直连
             if (url != null && url.length() > 0) { // user specified URL, could be peer-to-peer address, or register center's address.
                 String[] us = Constants.SEMICOLON_SPLIT_PATTERN.split(url);
                 if (us != null && us.length > 0) {
@@ -420,8 +435,10 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
     protected boolean shouldJvmRefer(Map<String, String> map) {
         URL tmpUrl = new URL("temp", "localhost", 0, map);
         boolean isJvmRefer;
+        //已被摒弃，使用scope来判断是否本地引入
         if (isInjvm() == null) {
             // if a url is specified, don't do local reference
+            //url 配置被指定，则不做本地引用
             if (url != null && url.length() > 0) {
                 isJvmRefer = false;
             } else {
@@ -478,6 +495,7 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
     }
 
     private void completeCompoundConfigs() {
+        //从 ConsumerConfig 对象中，读取 application、module、registries、monitor 配置对象
         if (consumer != null) {
             if (application == null) {
                 setApplication(consumer.getApplication());
@@ -492,6 +510,7 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
                 setMonitor(consumer.getMonitor());
             }
         }
+        //从 ModuleConfig 对象中，读取 registries、monitor 配置对象。
         if (module != null) {
             if (registries == null) {
                 setRegistries(module.getRegistries());
@@ -500,6 +519,7 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
                 setMonitor(module.getMonitor());
             }
         }
+        //从 ApplicationConfig 对象中，读取 registries、monitor 配置对象。
         if (application != null) {
             if (registries == null) {
                 setRegistries(application.getRegistries());
