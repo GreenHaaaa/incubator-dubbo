@@ -229,9 +229,14 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
      * <ol>
      * <li> If URL has been converted to invoker, it is no longer re-referenced and obtained directly from the cache,
      * and notice that any parameter changes in the URL will be re-referenced.</li>
+     * <li> 如果URl已经转换成invoker，则不再从缓存重新转换，直接从缓存中获取，
+     * 注意任何参数的变更都会导致重新生成invoker对象</li>
      * <li>If the incoming invoker list is not empty, it means that it is the latest invoker list.</li>
+     * <li>若输入invoker列表不为空，表明为最新的</li>
      * <li>If the list of incoming invokerUrl is empty, It means that the rule is only a override rule or a route
      * rule, which needs to be re-contrasted to decide whether to re-reference.</li>
+     * <li>如果传入InvokerURL的列表为空，则意味着该规则只是一个覆盖规则或路由规则，
+     * 需要对其进行重新对比以决定是否重新引用。</li>
      * </ol>
      *
      * @param invokerUrls this parameter can't be null
